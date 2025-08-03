@@ -66,7 +66,7 @@ router.post('/forgot-password', async (req, res) => {
     if (!user) return res.status(404).json({ message: 'User not found' });
 
     const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, { expiresIn: '15m' });
-    const resetLink = `http://localhost:3000/reset-password/${token}`;
+    const resetLink = `${BASE_URL}/reset-password/${token}`;
 
     if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
       console.error('Missing EMAIL_USER or EMAIL_PASS in .env');
