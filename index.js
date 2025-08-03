@@ -8,26 +8,43 @@ const { Server } = require('socket.io');
 const app = express();
 const server = http.createServer(app);
 
-// Set up Socket.IO with CORS
+// === Dynamic origin based on NODE_ENV ===
+const isProd = process.env.NODE_ENV === 'production';
+const allowedOrigins = isProd
+  ? ['https://www.amoryn.in', 'https://amoryn.in']
+  : ['http://localhost:3000'];
+
+// === Set up Socket.IO with CORS ===
 const io = new Server(server, {
   cors: {
-    origin: 'http://localhost:3000',
+    origin: allowedOrigins,
     methods: ['GET', 'POST'],
+    credentials: true,
   },
 });
 
-// Attach io and userSocketMap globally
+// === Attach io and userSocketMap globally ===
 app.set('io', io);
 const userSocketMap = new Map();
 global.userSocketMap = userSocketMap;
 
-// Middlewares
-app.use(cors());
+// === CORS Middleware for Express ===
+app.use(cors({
+  origin: function (origin, callback) {
+    // Allow requests with no origin like curl or mobile apps
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS: ' + origin));
+    }
+  },
+  credentials: true,
+}));
+
 app.use(express.json());
-app.use('/api/user', require('./routes/user'));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-// Routes
+// === Routes ===
 const authRoutes = require('./routes/auth');
 const userRoutes = require('./routes/user');
 const chatRoutes = require('./routes/chat');
@@ -36,7 +53,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/user', userRoutes);
 app.use('/api/chat', chatRoutes);
 
-// MongoDB Connection
+// === MongoDB Connection ===
 mongoose.connect(process.env.MONGO_URI, {
   useNewUrlParser: true,
   useUnifiedTopology: true,
@@ -47,14 +64,13 @@ mongoose.connect(process.env.MONGO_URI, {
 })
 .catch((err) => console.error('❌ MongoDB connection error:', err));
 
-// WebSocket Events
+// === WebSocket Events ===
 io.on('connection', (socket) => {
   console.log('📡 User connected:', socket.id);
 
   socket.on('register-user', (userId) => {
     if (userId) {
       userSocketMap.set(userId, socket.id);
-      // FIX: Use backticks for template literal with emoji
       console.log(`✅ Registered user ${userId} to socket ${socket.id}`);
     }
   });
