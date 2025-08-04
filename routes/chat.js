@@ -3,8 +3,9 @@ const router = express.Router();
 const auth = require('../middleware/auth');
 const User = require('../models/User');
 const Message = require('../models/Message');
+const { BASE_URL } = require('../config'); // ✅ Add this if you store BASE_URL in config
 
-// GET conversations endpoint
+// GET all chat partners
 router.get('/conversations', auth, async (req, res) => {
   try {
     const currentUserId = req.user._id;
@@ -21,7 +22,9 @@ router.get('/conversations', auth, async (req, res) => {
     const formatted = users.map(u => ({
       _id: u._id,
       name: u.name,
-      photo: u.photos?.length ? `${BASE_URL}/${u.photos[0].replace(/\\/g, '/')}` : null
+      photo: u.photos?.[0]
+        ? `${BASE_URL}/${u.photos[0].replace(/\\/g, '/')}`
+        : null
     }));
 
     res.json(formatted);
@@ -31,57 +34,57 @@ router.get('/conversations', auth, async (req, res) => {
   }
 });
 
-// GET messages between current user and otherUser, mark unread as read
+// GET chat history
 router.get('/messages/:userId', auth, async (req, res) => {
   try {
     const current = req.user._id;
     const otherUser = req.params.userId;
 
-    // Fetch messages between the two users
     const messages = await Message.find({
       $or: [
         { from: current, to: otherUser },
         { from: otherUser, to: current }
       ]
-    }).sort('createdAt');
+    }).sort({ createdAt: 1 });
 
-    // Mark all unread messages from otherUser to currentUser as read
     await Message.updateMany(
       { from: otherUser, to: current, read: false },
       { $set: { read: true } }
     );
 
-    res.json(
-      messages.map(m => ({
-        fromSelf: m.from.toString() === current.toString(),
-        message: m.message,
-        timestamp: m.createdAt
-      }))
-    );
+    const formatted = messages.map(m => ({
+      fromSelf: m.from.toString() === current.toString(),
+      message: m.message,
+      timestamp: m.createdAt
+    }));
+
+    res.json(formatted);
   } catch (err) {
     console.error('Error fetching messages:', err);
     res.status(500).json({ error: 'Failed to load messages' });
   }
 });
 
-// POST send message endpoint
+// Send a message — allowed only for premium users
 router.post('/send', auth, async (req, res) => {
   try {
     const { to, message } = req.body;
 
-    if (!req.user || !req.user._id) return res.status(401).json({ error: 'Not authenticated' });
+    if (!req.user?.isPremium) {
+      return res.status(403).json({ error: 'Only premium users can send messages' });
+    }
+
     if (!to || !message) return res.status(400).json({ error: 'Missing recipient or message' });
 
     const msg = new Message({
       from: req.user._id,
       to,
       message,
-      read: false, // new messages are unread by default
+      read: false,
     });
 
     await msg.save();
 
-    // Emit notification via socket.io
     const io = req.app.get('io');
     const userSocketMap = global.userSocketMap;
     const recipientSocketId = userSocketMap.get(to.toString());
@@ -90,7 +93,6 @@ router.post('/send', auth, async (req, res) => {
       io.to(recipientSocketId).emit('new-message', {
         from: req.user._id.toString(),
         message,
-        chatId: req.user._id.toString() === to.toString() ? to : req.user._id.toString()
       });
     }
 
@@ -101,7 +103,7 @@ router.post('/send', auth, async (req, res) => {
   }
 });
 
-// GET unread message counts per user
+// GET unread message counts
 router.get('/unread', auth, async (req, res) => {
   try {
     const currentUserId = req.user._id;
@@ -111,7 +113,6 @@ router.get('/unread', auth, async (req, res) => {
       { $group: { _id: '$from', count: { $sum: 1 } } }
     ]);
 
-    // Format as { userId: count }
     const unreadCounts = {};
     unreadCountsRaw.forEach(({ _id, count }) => {
       unreadCounts[_id.toString()] = count;
