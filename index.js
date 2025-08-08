@@ -5,6 +5,7 @@ require('dotenv').config();
 const path = require('path');
 const http = require('http');
 const { Server } = require('socket.io');
+
 const app = express();
 const server = http.createServer(app);
 
@@ -42,7 +43,13 @@ app.use(cors({
 }));
 
 app.use(express.json());
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
+// === Serve uploaded files with CORS headers ===
+app.use('/uploads', express.static(path.join(__dirname, 'uploads'), {
+  setHeaders: (res, filePath) => {
+    res.set('Access-Control-Allow-Origin', '*');
+  }
+}));
 
 // === Routes ===
 const authRoutes = require('./routes/auth');
