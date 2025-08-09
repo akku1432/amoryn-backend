@@ -45,7 +45,7 @@ app.use(cors({
 app.use(express.json());
 
 // === Serve uploaded files with CORS & CORP headers ===
-app.use('/upload', express.static(path.join(__dirname, 'upload'), {
+app.use('/uploads', express.static(path.join(__dirname, 'uploads'), {
   setHeaders: (res, filePath) => {
     // Allow cross-origin image access and avoid CORB blocking
     res.set('Access-Control-Allow-Origin', '*');
