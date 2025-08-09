@@ -3,7 +3,7 @@ const path = require('path');
 const fs = require('fs');
 
 // ensure upload directory path
-const uploadDir = path.join(__dirname, '..', 'upload');
+const uploadDir = path.join(__dirname, '..', 'uploads');
 
 // Storage config
 const storage = multer.diskStorage({
