@@ -5,7 +5,7 @@ const router = express.Router();
 const User = require('../models/User');
 const Subscription = require('../models/Subscription');
 const auth = require('../middleware/auth');
-// NOTE: require the uploads middleware file (matches your middleware/uploads.js)
+// NOTE: require the upload middleware file (matches your middleware/upload.js)
 const upload = require('../middleware/upload');
 const { attachSubscription } = require('../middleware/subscription');
 
@@ -56,8 +56,8 @@ router.put('/profile', auth, attachSubscription, upload.array('photos', 5), asyn
     // Parse saved/existing photos from client
     const savedPhotos = existingPhotos ? JSON.parse(existingPhotos) : [];
 
-    // Save new photos as relative 'uploads/<filename>' paths so frontend can access via BASE_URL/uploads/...
-    const newPhotos = (req.files || []).map(f => `uploads/${path.basename(f.path)}`);
+    // Save new photos as relative 'upload/<filename>' paths so frontend can access via BASE_URL/upload/...
+    const newPhotos = (req.files || []).map(f => `upload/${path.basename(f.path)}`);
 
     const totalPhotos = savedPhotos.length + newPhotos.length;
 
@@ -79,7 +79,7 @@ router.put('/profile', auth, attachSubscription, upload.array('photos', 5), asyn
 router.delete('/photo/:filename', auth, async (req, res) => {
   try {
     const filename = req.params.filename;
-    const photoPath = path.join(__dirname, '..', 'uploads', filename);
+    const photoPath = path.join(__dirname, '..', 'upload', filename);
 
     const user = await User.findById(req.user._id);
     if (!user) return res.status(404).json({ error: 'User not found' });
