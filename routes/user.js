@@ -5,7 +5,8 @@ const router = express.Router();
 const User = require('../models/User');
 const Subscription = require('../models/Subscription');
 const auth = require('../middleware/auth');
-const upload = require('../middleware/upload');
+// NOTE: require the uploads middleware file (matches your middleware/uploads.js)
+const upload = require('../middleware/uploads');
 const { attachSubscription } = require('../middleware/subscription');
 
 // ✅ GET /profile
@@ -52,8 +53,12 @@ router.put('/profile', auth, attachSubscription, upload.array('photos', 5), asyn
     user.state = state || '';
     user.city = city || '';
 
+    // Parse saved/existing photos from client
     const savedPhotos = existingPhotos ? JSON.parse(existingPhotos) : [];
-    const newPhotos = req.files.map(f => f.path.replace(/\\/g, '/'));
+
+    // Save new photos as relative 'uploads/<filename>' paths so frontend can access via BASE_URL/uploads/...
+    const newPhotos = (req.files || []).map(f => `uploads/${path.basename(f.path)}`);
+
     const totalPhotos = savedPhotos.length + newPhotos.length;
 
     if (totalPhotos > 5) {
