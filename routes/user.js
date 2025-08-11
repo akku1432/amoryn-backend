@@ -9,7 +9,7 @@ const mongoose = require('mongoose');
 // NOTE: require the uploads middleware file (matches your middleware/uploads.js)
 const upload = require('../middleware/upload');
 const { attachSubscription } = require('../middleware/subscription');
-// Initialize GridFS
+// Initialize GridFS bucket after MongoDB connection opens
 let gfsBucket;
 mongoose.connection.once('open', () => {
   gfsBucket = new mongoose.mongo.GridFSBucket(mongoose.connection.db, {
@@ -17,7 +17,7 @@ mongoose.connection.once('open', () => {
   });
 });
 
-// ✅ GET /profile
+// GET user profile
 router.get('/profile', auth, attachSubscription, async (req, res) => {
   try {
     const user = await User.findById(req.user._id).select('-password');
@@ -34,15 +34,25 @@ router.get('/profile', auth, attachSubscription, async (req, res) => {
   }
 });
 
-// ✅ PUT /profile (update text details only)
+// *** UPDATED PUT /profile - accept hobbies as array or JSON string ***
 router.put('/profile', auth, attachSubscription, async (req, res) => {
   try {
     const user = await User.findById(req.user._id);
     if (!user) return res.status(404).json({ error: 'User not found' });
 
-    const { hobbies, smoking, drinking, relationshipType, bio, country, state, city } = req.body;
+    let { hobbies, smoking, drinking, relationshipType, bio, country, state, city } = req.body;
 
-    user.hobbies = hobbies ? JSON.parse(hobbies) : [];
+    // Validate hobbies - accept array or stringified JSON array
+    if (!Array.isArray(hobbies)) {
+      try {
+        hobbies = typeof hobbies === 'string' ? JSON.parse(hobbies) : [];
+        if (!Array.isArray(hobbies)) hobbies = [];
+      } catch (e) {
+        hobbies = [];
+      }
+    }
+
+    user.hobbies = hobbies;
     user.smoking = smoking || '';
     user.drinking = drinking || '';
     user.relationshipType = relationshipType || '';
@@ -54,12 +64,12 @@ router.put('/profile', auth, attachSubscription, async (req, res) => {
     await user.save();
     res.json({ message: 'Profile updated successfully' });
   } catch (err) {
-    console.error(err);
+    console.error('Profile update error:', err);
     res.status(500).json({ error: 'Profile update failed' });
   }
 });
 
-// ✅ POST /profile/picture - upload/replace single profile picture
+// POST profile picture upload
 router.post('/profile/picture', auth, upload.single('profilePicture'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'No image uploaded' });
@@ -99,7 +109,7 @@ router.post('/profile/picture', auth, upload.single('profilePicture'), async (re
   }
 });
 
-// ✅ GET /profile/picture/:userId - fetch single profile picture
+// GET profile picture by userId
 router.get('/profile/picture/:userId', async (req, res) => {
   try {
     if (!gfsBucket) return res.status(500).json({ error: 'Image storage not initialized' });
@@ -121,24 +131,23 @@ router.get('/profile/picture/:userId', async (req, res) => {
     res.status(500).json({ error: 'Failed to fetch profile picture' });
   }
 });
-// DELETE account + profile picture cleanup
+
+// DELETE user account and profile picture
 router.delete('/:id', async (req, res) => {
   try {
     const userId = req.params.id;
 
-    // Find user first
     const user = await User.findById(userId);
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
 
-    // Delete associated GridFS profile picture if exists
-    if (user.profilePicture) { // assuming you store the filename or ObjectId in this field
+    // Delete profile picture if exists
+    if (user.profilePicture) {
       const bucket = new mongoose.mongo.GridFSBucket(mongoose.connection.db, {
-        bucketName: 'uploads' // change if your bucket name is different
+        bucketName: 'profilePictures'
       });
 
-      // If profilePicture stores the ObjectId
       try {
         await bucket.delete(new mongoose.Types.ObjectId(user.profilePicture));
         console.log(`Deleted GridFS file for user ${userId}`);
@@ -147,7 +156,6 @@ router.delete('/:id', async (req, res) => {
       }
     }
 
-    // Delete user document
     await User.findByIdAndDelete(userId);
 
     res.json({ message: 'Account and profile picture deleted successfully' });
@@ -156,6 +164,7 @@ router.delete('/:id', async (req, res) => {
     res.status(500).json({ message: 'Server error' });
   }
 });
+
 
 // ✅ GET Match Suggestions
 router.get('/match', auth, attachSubscription, async (req, res) => {
