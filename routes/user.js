@@ -1,15 +1,31 @@
 const express = require('express');
 const fs = require('fs');
-const path = require('path');
 const router = express.Router();
 const mongoose = require('mongoose');
+const cors = require('cors');
 const User = require('../models/User');
 const Subscription = require('../models/Subscription');
 const auth = require('../middleware/auth');
 const upload = require('../middleware/upload');
 const { attachSubscription } = require('../middleware/subscription');
 
-// GridFS bucket (lazy init safe)
+// ---------- CORS (router-level) ----------
+const allowedOrigins = ['https://www.amoryn.in', 'http://localhost:3000'];
+const corsOptions = {
+  origin: (origin, cb) => {
+    if (!origin || allowedOrigins.includes(origin)) return cb(null, true);
+    return cb(new Error('Not allowed by CORS'));
+  },
+  credentials: true,
+  methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  exposedHeaders: ['Content-Type', 'Content-Length'],
+  maxAge: 86400,
+};
+router.use(cors(corsOptions));
+router.options('*', cors(corsOptions)); // handle all preflight
+
+// ---------- GridFS bucket (lazy init safe) ----------
 let gfsBucket;
 const getGfsBucket = () => {
   if (gfsBucket) return gfsBucket;
@@ -25,7 +41,7 @@ mongoose.connection.once('open', () => {
   getGfsBucket();
 });
 
-// Helpers to normalize inputs
+// ---------- Helpers ----------
 const normalizeHobbies = (hobbies) => {
   if (Array.isArray(hobbies)) return hobbies;
   if (typeof hobbies === 'string') {
@@ -127,7 +143,6 @@ router.post('/profile/picture', auth, upload.single('profilePicture'), async (re
       user.profilePicture = file._id;
       await user.save();
 
-      // Clean up temp file if present
       if (tempFilePath) {
         fs.unlink(tempFilePath, (unlinkErr) => {
           if (unlinkErr) console.warn('Temp file cleanup error:', unlinkErr.message);
@@ -168,7 +183,6 @@ router.get('/profile/picture/:userId', async (req, res) => {
 
     const fileId = new mongoose.Types.ObjectId(user.profilePicture);
 
-    // Try to set proper Content-Type from file metadata
     const files = await bucket.find({ _id: fileId }).toArray();
     if (files && files[0]?.contentType) {
       res.set('Content-Type', files[0].contentType);
