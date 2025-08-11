@@ -34,15 +34,39 @@ router.get('/profile', auth, attachSubscription, async (req, res) => {
   }
 });
 
-// ✅ PUT /profile (update text details only)
-router.put('/profile', auth, attachSubscription, async (req, res) => {
+// ✅ PUT /profile - update text fields + optional profile image
+router.put('/profile', auth, upload.single('profileImage'), async (req, res) => {
   try {
     const user = await User.findById(req.user._id);
     if (!user) return res.status(404).json({ error: 'User not found' });
 
-    const { hobbies, smoking, drinking, relationshipType, bio, country, state, city } = req.body;
+    // Extract text fields from request body
+    const {
+      hobbies,
+      smoking,
+      drinking,
+      relationshipType,
+      bio,
+      country,
+      state,
+      city
+    } = req.body;
 
-    user.hobbies = hobbies ? JSON.parse(hobbies) : [];
+    // Parse hobbies (could be array or JSON string)
+    if (hobbies) {
+      if (Array.isArray(hobbies)) {
+        user.hobbies = hobbies;
+      } else {
+        try {
+          user.hobbies = JSON.parse(hobbies);
+        } catch {
+          user.hobbies = [hobbies]; // single string fallback
+        }
+      }
+    } else {
+      user.hobbies = [];
+    }
+
     user.smoking = smoking || '';
     user.drinking = drinking || '';
     user.relationshipType = relationshipType || '';
@@ -51,53 +75,43 @@ router.put('/profile', auth, attachSubscription, async (req, res) => {
     user.state = state || '';
     user.city = city || '';
 
+    // Handle profile image if uploaded
+    if (req.file) {
+      if (!gfsBucket) return res.status(500).json({ error: 'Image storage not initialized' });
+
+      // Remove old picture if exists
+      if (user.profilePicture) {
+        try {
+          await gfsBucket.delete(new mongoose.Types.ObjectId(user.profilePicture));
+        } catch (err) {
+          console.warn('Old profile picture delete error:', err.message);
+        }
+      }
+
+      // Upload new picture to GridFS
+      const uploadStream = gfsBucket.openUploadStream(req.file.originalname, {
+        contentType: req.file.mimetype
+      });
+      uploadStream.end(req.file.buffer);
+
+      // Wait until upload finishes
+      await new Promise((resolve, reject) => {
+        uploadStream.on('finish', (file) => {
+          user.profilePicture = file._id;
+          resolve();
+        });
+        uploadStream.on('error', reject);
+      });
+    }
+
     await user.save();
     res.json({ message: 'Profile updated successfully' });
   } catch (err) {
-    console.error(err);
+    console.error('Profile update error:', err);
     res.status(500).json({ error: 'Profile update failed' });
   }
 });
 
-// ✅ POST /profile/picture - upload/replace single profile picture
-router.post('/profile/picture', auth, upload.single('profilePicture'), async (req, res) => {
-  try {
-    if (!req.file) return res.status(400).json({ error: 'No image uploaded' });
-    if (!gfsBucket) return res.status(500).json({ error: 'Image storage not initialized' });
-
-    const user = await User.findById(req.user._id);
-
-    // Remove old picture if exists
-    if (user.profilePicture) {
-      try {
-        await gfsBucket.delete(new mongoose.Types.ObjectId(user.profilePicture));
-      } catch (err) {
-        console.warn('Old profile picture delete error:', err.message);
-      }
-    }
-
-    // Upload new picture to GridFS
-    const uploadStream = gfsBucket.openUploadStream(req.file.originalname, {
-      contentType: req.file.mimetype
-    });
-    uploadStream.end(req.file.buffer);
-
-    uploadStream.on('finish', async (file) => {
-      user.profilePicture = file._id;
-      await user.save();
-      res.json({ message: 'Profile picture updated', fileId: file._id });
-    });
-
-    uploadStream.on('error', (err) => {
-      console.error('GridFS upload error:', err);
-      res.status(500).json({ error: 'Image upload failed' });
-    });
-
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Profile picture upload failed' });
-  }
-});
 
 // ✅ GET /profile/picture/:userId - fetch single profile picture
 router.get('/profile/picture/:userId', async (req, res) => {
