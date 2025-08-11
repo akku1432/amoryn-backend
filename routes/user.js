@@ -34,43 +34,70 @@ router.get('/profile', auth, attachSubscription, async (req, res) => {
   }
 });
 
-// PUT /profile
-router.put('/profile', auth, upload.single('profileImage'), async (req, res) => {
+// ✅ PUT /profile (update text details only)
+router.put('/profile', auth, attachSubscription, async (req, res) => {
   try {
-    const userId = req.user.id;
-    const updates = {};
+    const user = await User.findById(req.user._id);
+    if (!user) return res.status(404).json({ error: 'User not found' });
 
-    // Extract text fields (editable only)
-    const { gender, lookingFor, country, state, city } = req.body;
+    const { hobbies, smoking, drinking, relationshipType, bio, country, state, city } = req.body;
 
-    if (gender) updates.gender = gender;
-    if (lookingFor) updates.lookingFor = lookingFor;
-    if (country) updates.country = country;
-    if (state) updates.state = state;
-    if (city) updates.city = city;
+    user.hobbies = hobbies ? JSON.parse(hobbies) : [];
+    user.smoking = smoking || '';
+    user.drinking = drinking || '';
+    user.relationshipType = relationshipType || '';
+    user.bio = bio || '';
+    user.country = country || '';
+    user.state = state || '';
+    user.city = city || '';
 
-    // If an image is uploaded, store GridFS file ID
-    if (req.file && req.file.id) {
-      updates.profileImage = req.file.id;
-    }
-
-    // Update user in MongoDB
-    const updatedUser = await User.findByIdAndUpdate(
-      userId,
-      { $set: updates },
-      { new: true }
-    ).populate('profileImage'); // optional populate if you want to return image info
-
-    res.json({
-      message: 'Profile updated successfully',
-      user: updatedUser
-    });
-  } catch (error) {
-    console.error('Error updating profile:', error);
-    res.status(500).json({ error: 'Server error while updating profile' });
+    await user.save();
+    res.json({ message: 'Profile updated successfully' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Profile update failed' });
   }
 });
 
+// ✅ POST /profile/picture - upload/replace single profile picture
+router.post('/profile/picture', auth, upload.single('profilePicture'), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: 'No image uploaded' });
+    if (!gfsBucket) return res.status(500).json({ error: 'Image storage not initialized' });
+
+    const user = await User.findById(req.user._id);
+
+    // Remove old picture if exists
+    if (user.profilePicture) {
+      try {
+        await gfsBucket.delete(new mongoose.Types.ObjectId(user.profilePicture));
+      } catch (err) {
+        console.warn('Old profile picture delete error:', err.message);
+      }
+    }
+
+    // Upload new picture to GridFS
+    const uploadStream = gfsBucket.openUploadStream(req.file.originalname, {
+      contentType: req.file.mimetype
+    });
+    uploadStream.end(req.file.buffer);
+
+    uploadStream.on('finish', async (file) => {
+      user.profilePicture = file._id;
+      await user.save();
+      res.json({ message: 'Profile picture updated', fileId: file._id });
+    });
+
+    uploadStream.on('error', (err) => {
+      console.error('GridFS upload error:', err);
+      res.status(500).json({ error: 'Image upload failed' });
+    });
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Profile picture upload failed' });
+  }
+});
 
 // ✅ GET /profile/picture/:userId - fetch single profile picture
 router.get('/profile/picture/:userId', async (req, res) => {
