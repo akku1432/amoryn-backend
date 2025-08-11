@@ -10,7 +10,7 @@ const upload = require('../middleware/upload');
 const { attachSubscription } = require('../middleware/subscription');
 
 // ---------- CORS (router-level) ----------
-const allowedOrigins = ['https://www.amoryn.in', 'http://localhost:3000'];
+const allowedOrigins = ['https://www.amoryn.in', 'https://amoryn.in', 'http://localhost:3000'];
 const corsOptions = {
   origin: (origin, cb) => {
     if (!origin || allowedOrigins.includes(origin)) return cb(null, true);

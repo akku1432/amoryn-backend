@@ -29,7 +29,7 @@ const userSocketMap = new Map();
 global.userSocketMap = userSocketMap;
 
 // === CORS Middleware for Express ===
-app.use(cors({
+const corsOptions = {
   origin: function (origin, callback) {
     if (!origin || allowedOrigins.includes(origin)) {
       callback(null, true);
@@ -38,7 +38,13 @@ app.use(cors({
     }
   },
   credentials: true,
-}));
+  methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+};
+
+app.use(cors(corsOptions));
+// Handle all preflight requests (Express 5 requires a regex, not '*')
+app.options(/.*/, cors(corsOptions));
 
 app.use(express.json());
 
