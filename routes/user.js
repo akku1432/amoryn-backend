@@ -129,6 +129,14 @@ router.post('/profile/picture', auth, upload.single('profilePicture'), async (re
     const uploadStream = bucket.openUploadStream(req.file.originalname, {
       contentType: req.file.mimetype,
     });
+    
+    // Get the file ID from the upload stream
+    const fileId = uploadStream.id;
+    
+    if (!fileId) {
+      console.error('GridFS upload stream ID is undefined');
+      return res.status(500).json({ error: 'Failed to initialize upload stream' });
+    }
 
     // Handle both memory storage (buffer) and disk storage (path)
     if (req.file.buffer) {
@@ -140,17 +148,24 @@ router.post('/profile/picture', auth, upload.single('profilePicture'), async (re
       return res.status(400).json({ error: 'Invalid upload payload' });
     }
 
-    uploadStream.on('finish', async (file) => {
-      user.profilePicture = file._id;
-      await user.save();
+    uploadStream.on('finish', async () => {
+      try {
+        console.log('GridFS upload finished, fileId:', fileId);
+        user.profilePicture = fileId;
+        await user.save();
+        console.log('User profile picture updated successfully');
 
-      if (tempFilePath) {
-        fs.unlink(tempFilePath, (unlinkErr) => {
-          if (unlinkErr) console.warn('Temp file cleanup error:', unlinkErr.message);
-        });
+        if (tempFilePath) {
+          fs.unlink(tempFilePath, (unlinkErr) => {
+            if (unlinkErr) console.warn('Temp file cleanup error:', unlinkErr.message);
+          });
+        }
+
+        res.json({ message: 'Profile picture updated', fileId: fileId });
+      } catch (saveErr) {
+        console.error('Error saving user with new profile picture:', saveErr);
+        res.status(500).json({ error: 'Failed to save profile picture' });
       }
-
-      res.json({ message: 'Profile picture updated', fileId: file._id });
     });
 
     uploadStream.on('error', (err) => {
