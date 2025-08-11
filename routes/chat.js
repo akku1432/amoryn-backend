@@ -22,8 +22,8 @@ router.get('/conversations', auth, async (req, res) => {
     const formatted = users.map(u => ({
       _id: u._id,
       name: u.name,
-      photo: u.photos?.[0]
-        ? `${BASE_URL}/${u.photos[0].replace(/\\/g, '/')}`
+      photo: u.profilePicture
+        ? `/api/user/profile/picture/${u._id}`
         : null
     }));
 

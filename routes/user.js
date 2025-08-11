@@ -286,8 +286,19 @@ router.get('/match', auth, attachSubscription, async (req, res) => {
       gender: { $in: genderMatch },
     }).select('-password');
 
+    // Add profile picture URLs to photos array for frontend compatibility
+    const usersWithPhotos = matchedUsers.map(user => {
+      const userObj = user.toObject();
+      if (userObj.profilePicture) {
+        userObj.photos = [`/api/user/profile/picture/${userObj._id}`];
+      } else {
+        userObj.photos = [];
+      }
+      return userObj;
+    });
+
     res.json({
-      users: matchedUsers,
+      users: usersWithPhotos,
       isPremium: req.user.isPremium,
       plan: req.user.subscriptionPlan,
     });
@@ -368,7 +379,18 @@ router.get('/friends', auth, async (req, res) => {
     const usersWhoLikedMe = await User.find({ likes: req.user._id }).select('-password');
     const mutualFriends = usersWhoLikedMe.filter(u => iLiked.includes(u._id.toString()));
 
-    res.json(mutualFriends);
+    // Add profile picture URLs to photos array for frontend compatibility
+    const friendsWithPhotos = mutualFriends.map(user => {
+      const userObj = user.toObject();
+      if (userObj.profilePicture) {
+        userObj.photos = [`/api/user/profile/picture/${userObj._id}`];
+      } else {
+        userObj.photos = [];
+      }
+      return userObj;
+    });
+
+    res.json(friendsWithPhotos);
   } catch (err) {
     res.status(500).json({ error: 'Failed to fetch friends' });
   }
@@ -382,7 +404,18 @@ router.get('/requests', auth, attachSubscription, async (req, res) => {
       u => !req.user.likes.includes(u._id.toString())
     );
 
-    res.json(pending);
+    // Add profile picture URLs to photos array for frontend compatibility
+    const requestsWithPhotos = pending.map(user => {
+      const userObj = user.toObject();
+      if (userObj.profilePicture) {
+        userObj.photos = [`/api/user/profile/picture/${userObj._id}`];
+      } else {
+        userObj.photos = [];
+      }
+      return userObj;
+    });
+
+    res.json(requestsWithPhotos);
   } catch (err) {
     res.status(500).json({ error: 'Failed to fetch requests' });
   }
