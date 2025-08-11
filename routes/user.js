@@ -23,7 +23,8 @@ const corsOptions = {
   maxAge: 86400,
 };
 router.use(cors(corsOptions));
-router.options('*', cors(corsOptions)); // handle all preflight
+// Handle all preflight requests (Express 5 + path-to-regexp v6 no longer accepts '*')
+router.options(/.*/, cors(corsOptions));
 
 // ---------- GridFS bucket (lazy init safe) ----------
 let gfsBucket;
