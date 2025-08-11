@@ -5,6 +5,7 @@ const router = express.Router();
 const User = require('../models/User');
 const Subscription = require('../models/Subscription');
 const auth = require('../middleware/auth');
+const mongoose = require('mongoose');
 // NOTE: require the uploads middleware file (matches your middleware/uploads.js)
 const upload = require('../middleware/upload');
 const { attachSubscription } = require('../middleware/subscription');
