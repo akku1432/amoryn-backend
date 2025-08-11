@@ -292,7 +292,8 @@ router.get('/match', auth, attachSubscription, async (req, res) => {
       if (userObj.profilePicture) {
         userObj.photos = [`/api/user/profile/picture/${userObj._id}`];
       } else {
-        userObj.photos = [];
+        // Set a consistent structure to prevent blinking
+        userObj.photos = null;
       }
       return userObj;
     });
@@ -385,7 +386,8 @@ router.get('/friends', auth, async (req, res) => {
       if (userObj.profilePicture) {
         userObj.photos = [`/api/user/profile/picture/${userObj._id}`];
       } else {
-        userObj.photos = [];
+        // Set a consistent structure to prevent blinking
+        userObj.photos = null;
       }
       return userObj;
     });
@@ -410,7 +412,8 @@ router.get('/requests', auth, attachSubscription, async (req, res) => {
       if (userObj.profilePicture) {
         userObj.photos = [`/api/user/profile/picture/${userObj._id}`];
       } else {
-        userObj.photos = [];
+        // Set a consistent structure to prevent blinking
+        userObj.photos = null;
       }
       return userObj;
     });
