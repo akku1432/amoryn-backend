@@ -1,26 +1,22 @@
 const multer = require('multer');
-const path = require('path');
-const fs = require('fs');
 
-// ensure uploads directory path
-const uploadDir = path.join(__dirname, '..', 'uploads');
+// Use memory storage so files are not saved to disk
+const storage = multer.memoryStorage();
 
-// Storage config
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    // create uploads folder if not exists
-    if (!fs.existsSync(uploadDir)) {
-      fs.mkdirSync(uploadDir, { recursive: true });
-    }
-    cb(null, uploadDir); // absolute path
+// Multer instance
+const upload = multer({
+  storage,
+  limits: {
+    fileSize: 5 * 1024 * 1024 // 5 MB limit (you can adjust this)
   },
-  filename: function (req, file, cb) {
-    // sanitize filename (replace spaces) to avoid URL issues
-    const safeName = file.originalname.replace(/\s+/g, '_');
-    cb(null, Date.now() + '-' + safeName);
+  fileFilter: (req, file, cb) => {
+    // Accept only images
+    if (file.mimetype.startsWith('image/')) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only image files are allowed!'), false);
+    }
   }
 });
-
-const upload = multer({ storage });
 
 module.exports = upload;

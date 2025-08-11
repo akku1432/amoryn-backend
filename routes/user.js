@@ -8,6 +8,13 @@ const auth = require('../middleware/auth');
 // NOTE: require the uploads middleware file (matches your middleware/uploads.js)
 const upload = require('../middleware/upload');
 const { attachSubscription } = require('../middleware/subscription');
+// Initialize GridFS
+let gfsBucket;
+mongoose.connection.once('open', () => {
+  gfsBucket = new mongoose.mongo.GridFSBucket(mongoose.connection.db, {
+    bucketName: 'profilePictures'
+  });
+});
 
 // ✅ GET /profile
 router.get('/profile', auth, attachSubscription, async (req, res) => {
@@ -26,23 +33,13 @@ router.get('/profile', auth, attachSubscription, async (req, res) => {
   }
 });
 
-// ✅ PUT /profile
-router.put('/profile', auth, attachSubscription, upload.array('photos', 5), async (req, res) => {
+// ✅ PUT /profile (update text details only)
+router.put('/profile', auth, attachSubscription, async (req, res) => {
   try {
     const user = await User.findById(req.user._id);
     if (!user) return res.status(404).json({ error: 'User not found' });
 
-    const {
-      hobbies,
-      smoking,
-      drinking,
-      relationshipType,
-      bio,
-      country,
-      state,
-      city,
-      existingPhotos,
-    } = req.body;
+    const { hobbies, smoking, drinking, relationshipType, bio, country, state, city } = req.body;
 
     user.hobbies = hobbies ? JSON.parse(hobbies) : [];
     user.smoking = smoking || '';
@@ -53,21 +50,7 @@ router.put('/profile', auth, attachSubscription, upload.array('photos', 5), asyn
     user.state = state || '';
     user.city = city || '';
 
-    // Parse saved/existing photos from client
-    const savedPhotos = existingPhotos ? JSON.parse(existingPhotos) : [];
-
-    // Save new photos as relative 'uploads/<filename>' paths so frontend can access via BASE_URL/uploads/...
-    const newPhotos = (req.files || []).map(f => `uploads/${path.basename(f.path)}`);
-
-    const totalPhotos = savedPhotos.length + newPhotos.length;
-
-    if (totalPhotos > 5) {
-      return res.status(400).json({ error: 'Maximum 5 photos allowed' });
-    }
-
-    user.photos = [...savedPhotos, ...newPhotos];
     await user.save();
-
     res.json({ message: 'Profile updated successfully' });
   } catch (err) {
     console.error(err);
@@ -75,23 +58,101 @@ router.put('/profile', auth, attachSubscription, upload.array('photos', 5), asyn
   }
 });
 
-// ✅ DELETE /photo/:filename
-router.delete('/photo/:filename', auth, async (req, res) => {
+// ✅ POST /profile/picture - upload/replace single profile picture
+router.post('/profile/picture', auth, upload.single('profilePicture'), async (req, res) => {
   try {
-    const filename = req.params.filename;
-    const photoPath = path.join(__dirname, '..', 'uploads', filename);
+    if (!req.file) return res.status(400).json({ error: 'No image uploaded' });
+    if (!gfsBucket) return res.status(500).json({ error: 'Image storage not initialized' });
 
     const user = await User.findById(req.user._id);
-    if (!user) return res.status(404).json({ error: 'User not found' });
 
-    user.photos = (user.photos || []).filter(p => !p.includes(filename));
-    if (fs.existsSync(photoPath)) fs.unlinkSync(photoPath);
+    // Remove old picture if exists
+    if (user.profilePicture) {
+      try {
+        await gfsBucket.delete(new mongoose.Types.ObjectId(user.profilePicture));
+      } catch (err) {
+        console.warn('Old profile picture delete error:', err.message);
+      }
+    }
 
-    await user.save();
-    res.json({ message: 'Photo deleted successfully' });
+    // Upload new picture to GridFS
+    const uploadStream = gfsBucket.openUploadStream(req.file.originalname, {
+      contentType: req.file.mimetype
+    });
+    uploadStream.end(req.file.buffer);
+
+    uploadStream.on('finish', async (file) => {
+      user.profilePicture = file._id;
+      await user.save();
+      res.json({ message: 'Profile picture updated', fileId: file._id });
+    });
+
+    uploadStream.on('error', (err) => {
+      console.error('GridFS upload error:', err);
+      res.status(500).json({ error: 'Image upload failed' });
+    });
+
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: 'Failed to delete photo' });
+    res.status(500).json({ error: 'Profile picture upload failed' });
+  }
+});
+
+// ✅ GET /profile/picture/:userId - fetch single profile picture
+router.get('/profile/picture/:userId', async (req, res) => {
+  try {
+    if (!gfsBucket) return res.status(500).json({ error: 'Image storage not initialized' });
+
+    const user = await User.findById(req.params.userId);
+    if (!user || !user.profilePicture) return res.status(404).json({ error: 'Profile picture not found' });
+
+    const fileId = new mongoose.Types.ObjectId(user.profilePicture);
+    const downloadStream = gfsBucket.openDownloadStream(fileId);
+
+    downloadStream.on('error', (err) => {
+      console.error('GridFS download error:', err);
+      res.status(404).json({ error: 'Image not found' });
+    });
+
+    downloadStream.pipe(res);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to fetch profile picture' });
+  }
+});
+// DELETE account + profile picture cleanup
+router.delete('/:id', async (req, res) => {
+  try {
+    const userId = req.params.id;
+
+    // Find user first
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    // Delete associated GridFS profile picture if exists
+    if (user.profilePicture) { // assuming you store the filename or ObjectId in this field
+      const bucket = new mongoose.mongo.GridFSBucket(mongoose.connection.db, {
+        bucketName: 'uploads' // change if your bucket name is different
+      });
+
+      // If profilePicture stores the ObjectId
+      try {
+        await bucket.delete(new mongoose.Types.ObjectId(user.profilePicture));
+        console.log(`Deleted GridFS file for user ${userId}`);
+      } catch (err) {
+        console.error('Error deleting GridFS file:', err.message);
+      }
+    }
+
+    // Delete user document
+    await User.findByIdAndDelete(userId);
+
+    res.json({ message: 'Account and profile picture deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting account:', error);
+    res.status(500).json({ message: 'Server error' });
   }
 });
 

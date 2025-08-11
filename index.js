@@ -2,7 +2,6 @@ const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 require('dotenv').config();
-const path = require('path');
 const http = require('http');
 const { Server } = require('socket.io');
 
@@ -32,7 +31,6 @@ global.userSocketMap = userSocketMap;
 // === CORS Middleware for Express ===
 app.use(cors({
   origin: function (origin, callback) {
-    // Allow requests with no origin like curl or mobile apps
     if (!origin || allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
@@ -44,14 +42,23 @@ app.use(cors({
 
 app.use(express.json());
 
-// === Serve uploaded files with CORS & CORP headers ===
-app.use('/uploads', express.static(path.join(__dirname, 'uploads'), {
-  setHeaders: (res, filePath) => {
-    // Allow cross-origin image access and avoid CORB blocking
-    res.set('Access-Control-Allow-Origin', '*');
-    res.set('Cross-Origin-Resource-Policy', 'cross-origin');
-  }
-}));
+// === MongoDB Connection ===
+mongoose.connect(process.env.MONGO_URI, {
+  useNewUrlParser: true,
+  useUnifiedTopology: true,
+})
+.then(() => {
+  console.log('✅ MongoDB Connected');
+
+  // Initialize GridFS bucket globally
+  global.gfsBucket = new mongoose.mongo.GridFSBucket(mongoose.connection.db, {
+    bucketName: 'profilePictures'
+  });
+  console.log('📦 GridFS bucket initialized');
+
+  server.listen(5000, () => console.log('🚀 Server running on port 5000'));
+})
+.catch((err) => console.error('❌ MongoDB connection error:', err));
 
 // === Routes ===
 const authRoutes = require('./routes/auth');
@@ -61,17 +68,6 @@ const chatRoutes = require('./routes/chat');
 app.use('/api/auth', authRoutes);
 app.use('/api/user', userRoutes);
 app.use('/api/chat', chatRoutes);
-
-// === MongoDB Connection ===
-mongoose.connect(process.env.MONGO_URI, {
-  useNewUrlParser: true,
-  useUnifiedTopology: true,
-})
-.then(() => {
-  console.log('✅ MongoDB Connected');
-  server.listen(5000, () => console.log('🚀 Server running on port 5000'));
-})
-.catch((err) => console.error('❌ MongoDB connection error:', err));
 
 // === WebSocket Events ===
 io.on('connection', (socket) => {
