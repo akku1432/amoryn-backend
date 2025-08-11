@@ -34,81 +34,40 @@ router.get('/profile', auth, attachSubscription, async (req, res) => {
   }
 });
 
-// ✅ PUT /profile - update text fields + optional profile image
+// PUT /profile
 router.put('/profile', auth, upload.single('profileImage'), async (req, res) => {
   try {
-    const user = await User.findById(req.user._id);
-    if (!user) return res.status(404).json({ error: 'User not found' });
+    const userId = req.user.id;
+    const updates = {};
 
-    // Extract text fields from request body
-    const {
-      hobbies,
-      smoking,
-      drinking,
-      relationshipType,
-      bio,
-      country,
-      state,
-      city
-    } = req.body;
+    // Extract text fields (editable only)
+    const { gender, lookingFor, country, state, city } = req.body;
 
-    // Parse hobbies (could be array or JSON string)
-    if (hobbies) {
-      if (Array.isArray(hobbies)) {
-        user.hobbies = hobbies;
-      } else {
-        try {
-          user.hobbies = JSON.parse(hobbies);
-        } catch {
-          user.hobbies = [hobbies]; // single string fallback
-        }
-      }
-    } else {
-      user.hobbies = [];
+    if (gender) updates.gender = gender;
+    if (lookingFor) updates.lookingFor = lookingFor;
+    if (country) updates.country = country;
+    if (state) updates.state = state;
+    if (city) updates.city = city;
+
+    // If an image is uploaded, store GridFS file ID
+    if (req.file && req.file.id) {
+      updates.profileImage = req.file.id;
     }
 
-    user.smoking = smoking || '';
-    user.drinking = drinking || '';
-    user.relationshipType = relationshipType || '';
-    user.bio = bio || '';
-    user.country = country || '';
-    user.state = state || '';
-    user.city = city || '';
+    // Update user in MongoDB
+    const updatedUser = await User.findByIdAndUpdate(
+      userId,
+      { $set: updates },
+      { new: true }
+    ).populate('profileImage'); // optional populate if you want to return image info
 
-    // Handle profile image if uploaded
-    if (req.file) {
-      if (!gfsBucket) return res.status(500).json({ error: 'Image storage not initialized' });
-
-      // Remove old picture if exists
-      if (user.profilePicture) {
-        try {
-          await gfsBucket.delete(new mongoose.Types.ObjectId(user.profilePicture));
-        } catch (err) {
-          console.warn('Old profile picture delete error:', err.message);
-        }
-      }
-
-      // Upload new picture to GridFS
-      const uploadStream = gfsBucket.openUploadStream(req.file.originalname, {
-        contentType: req.file.mimetype
-      });
-      uploadStream.end(req.file.buffer);
-
-      // Wait until upload finishes
-      await new Promise((resolve, reject) => {
-        uploadStream.on('finish', (file) => {
-          user.profilePicture = file._id;
-          resolve();
-        });
-        uploadStream.on('error', reject);
-      });
-    }
-
-    await user.save();
-    res.json({ message: 'Profile updated successfully' });
-  } catch (err) {
-    console.error('Profile update error:', err);
-    res.status(500).json({ error: 'Profile update failed' });
+    res.json({
+      message: 'Profile updated successfully',
+      user: updatedUser
+    });
+  } catch (error) {
+    console.error('Error updating profile:', error);
+    res.status(500).json({ error: 'Server error while updating profile' });
   }
 });
 
