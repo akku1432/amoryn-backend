@@ -1,4 +1,6 @@
 const multer = require('multer');
+const multer = require('multer');
+module.exports = upload;
 
 // Use memory storage so files are not saved to disk
 const storage = multer.memoryStorage();
