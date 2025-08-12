@@ -30,6 +30,10 @@ const userSchema = new mongoose.Schema({
   isPremium: { type: Boolean, default: false },
   subscription: subscriptionSchema,
 
+  // 🔒 Admin management
+  isBlocked: { type: Boolean, default: false },
+  isSuspended: { type: Boolean, default: false },
+
   // 🔃 Daily Like Limit support
   dailyLikeCount: { type: Number, default: 0 },
   lastLikeDate: { type: Date, default: null },

@@ -43,6 +43,40 @@ router.post('/login', async (req, res) => {
   const { email, password } = req.body;
 
   try {
+    // Check if this is an admin login attempt
+    if (email === 'support@amoryn.in') {
+      // Admin authentication - check against hardcoded password hash
+      // This password hash is for "Akkupalli@1432" - not visible in frontend
+      const adminPasswordHash = '$2b$10$YourHashedPasswordHere'; // This will be replaced with actual hash
+      
+      // For now, we'll use a simple comparison for demo
+      // In production, you should use proper password hashing
+      if (password === 'Akkupalli@1432') {
+        // Check if admin user exists, if not create one
+        let adminUser = await User.findOne({ email: 'support@amoryn.in' });
+        
+        if (!adminUser) {
+          // Create admin user if it doesn't exist
+          const hashedPassword = await bcrypt.hash('Akkupalli@1432', 10);
+          adminUser = new User({
+            name: 'Admin',
+            email: 'support@amoryn.in',
+            gender: 'Other',
+            dob: new Date('1990-01-01'),
+            lookingFor: 'All',
+            password: hashedPassword,
+            isPremium: true, // Admin is always premium
+          });
+          await adminUser.save();
+        }
+        
+        const token = jwt.sign({ userId: adminUser._id }, process.env.JWT_SECRET, { expiresIn: '1d' });
+        res.json({ token, isAdmin: true });
+        return;
+      }
+    }
+
+    // Regular user login
     const user = await User.findOne({ email: email.trim().toLowerCase() });
     if (!user) return res.status(401).json({ error: 'Invalid email or password' });
 
@@ -50,7 +84,7 @@ router.post('/login', async (req, res) => {
     if (!isMatch) return res.status(401).json({ error: 'Invalid email or password' });
 
     const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, { expiresIn: '1d' });
-    res.json({ token });
+    res.json({ token, isAdmin: false });
   } catch (err) {
     console.error('Login error:', err);
     res.status(500).json({ error: 'Login failed' });
