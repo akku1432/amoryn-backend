@@ -77,13 +77,14 @@ router.get('/profile', auth, attachSubscription, async (req, res) => {
 });
 
 // ✅ PUT /profile
-router.put('/profile', auth, attachSubscription, async (req, res) => {
+router.put('/profile', auth, attachSubscription, upload.single('profilePicture'), async (req, res) => {
   try {
     const user = await User.findById(req.user._id);
     if (!user) return res.status(404).json({ error: 'User not found' });
 
     const { hobbies, smoking, drinking, relationshipType, bio, country, state, city } = req.body;
 
+    // Update text fields
     user.hobbies = normalizeHobbies(hobbies);
     user.smoking = normalizeString(smoking);
     user.drinking = normalizeString(drinking);
@@ -92,6 +93,50 @@ router.put('/profile', auth, attachSubscription, async (req, res) => {
     user.country = normalizeString(country);
     user.state = normalizeString(state);
     user.city = normalizeString(city);
+
+    // Handle profile picture upload if provided
+    if (req.file) {
+      const bucket = getGfsBucket();
+      if (!bucket) {
+        return res.status(503).json({ error: 'Image storage not initialized' });
+      }
+
+      // Delete previous picture if exists
+      if (user.profilePicture) {
+        try {
+          await bucket.delete(new mongoose.Types.ObjectId(user.profilePicture));
+        } catch (err) {
+          console.warn('Old profile picture delete error:', err.message);
+        }
+      }
+
+      const uploadStream = bucket.openUploadStream(req.file.originalname, {
+        contentType: req.file.mimetype,
+      });
+      
+      const fileId = uploadStream.id;
+      
+      if (!fileId) {
+        console.error('GridFS upload stream ID is undefined');
+        return res.status(500).json({ error: 'Failed to initialize upload stream' });
+      }
+
+      // Handle memory storage (buffer)
+      if (req.file.buffer) {
+        uploadStream.end(req.file.buffer);
+      } else {
+        return res.status(400).json({ error: 'Invalid upload payload' });
+      }
+
+      // Wait for upload to complete
+      await new Promise((resolve, reject) => {
+        uploadStream.on('finish', () => {
+          user.profilePicture = fileId;
+          resolve();
+        });
+        uploadStream.on('error', reject);
+      });
+    }
 
     await user.save();
     res.json({ message: 'Profile updated successfully' });
