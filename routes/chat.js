@@ -26,10 +26,24 @@ router.get('/conversations', auth, async (req, res) => {
       _id: { $in: allUserIds, $ne: currentUserId }
     }).select('name photos profilePicture');
 
+    console.log('Raw users from database:', users);
+    console.log('Sample user object:', users[0]);
+
     const formatted = users.map(u => {
-      const photoUrl = u.photos && u.photos.length > 0 
-        ? `${BASE_URL}/${u.photos[0].replace(/^\//, '')}`
-        : (u.profilePicture ? `${BASE_URL}/api/user/profile/picture/${u._id}` : null);
+      console.log('Processing user:', u._id, 'name:', u.name, 'photos:', u.photos, 'profilePicture:', u.profilePicture);
+      
+      let photoUrl = null;
+      
+      // If user has profilePicture, use it
+      if (u.profilePicture) {
+        photoUrl = `${BASE_URL}/api/user/profile/picture/${u._id}`;
+      }
+      // If user has photos array, use the first photo
+      else if (u.photos && u.photos.length > 0) {
+        photoUrl = `${BASE_URL}/${u.photos[0].replace(/^\//, '')}`;
+      }
+      
+      console.log('Constructed photo URL:', photoUrl);
       
       return {
         _id: u._id,
