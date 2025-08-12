@@ -35,7 +35,13 @@ router.get('/conversations', auth, async (req, res) => {
       }
       // If user has photos array, use the first photo
       else if (u.photos && u.photos.length > 0) {
-        photoUrl = `${BASE_URL}/${u.photos[0].replace(/^\//, '')}`;
+        // Ensure proper URL construction
+        const photoPath = u.photos[0].replace(/^\//, '');
+        if (photoPath.startsWith('api/')) {
+          photoUrl = `${BASE_URL}/${photoPath}`;
+        } else {
+          photoUrl = `${BASE_URL}/api/${photoPath}`;
+        }
       }
       
       return {
