@@ -9,41 +9,27 @@ const { BASE_URL } = require('../config'); // ✅ Add this if you store BASE_URL
 router.get('/conversations', auth, async (req, res) => {
   try {
     const currentUserId = req.user._id;
-    console.log('Fetching conversations for user:', currentUserId);
 
     // Get users with existing messages
     const sentTo = await Message.distinct('to', { from: currentUserId });
     const receivedFrom = await Message.distinct('from', { to: currentUserId });
     const messageUserIds = [...new Set([...sentTo, ...receivedFrom])];
-    console.log('Users with messages:', messageUserIds);
 
     // Get users that the current user has liked (potential matches)
     const currentUser = await User.findById(currentUserId).select('likes');
     const likedUserIds = currentUser.likes || [];
-    console.log('Users liked by current user:', likedUserIds);
 
     // Combine both sets of users
     const allUserIds = [...new Set([...messageUserIds, ...likedUserIds])];
-    console.log('All user IDs:', allUserIds);
 
     const users = await User.find({
       _id: { $in: allUserIds, $ne: currentUserId }
     }).select('name photos profilePicture');
 
-    console.log('Found users:', users.length);
-
     const formatted = users.map(u => {
       const photoUrl = u.photos && u.photos.length > 0 
         ? `${BASE_URL}/${u.photos[0].replace(/^\//, '')}`
         : (u.profilePicture ? `${BASE_URL}/api/user/profile/picture/${u._id}` : null);
-      
-      console.log('User photo construction:', {
-        userId: u._id,
-        name: u.name,
-        photos: u.photos,
-        photoPath: u.photos?.[0],
-        constructedUrl: photoUrl
-      });
       
       return {
         _id: u._id,
@@ -52,7 +38,6 @@ router.get('/conversations', auth, async (req, res) => {
       };
     });
 
-    console.log('Formatted users:', formatted);
     res.json(formatted);
   } catch (err) {
     console.error('Error fetching conversations:', err);
