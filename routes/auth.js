@@ -5,6 +5,234 @@ const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const nodemailer = require('nodemailer');
 
+// Welcome email function
+const sendWelcomeEmail = async (userEmail, userName) => {
+  try {
+    if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
+      console.error('Missing EMAIL_USER or EMAIL_PASS in .env');
+      return false;
+    }
+
+    const transporter = nodemailer.createTransport({
+      service: 'gmail',
+      auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS,
+      },
+    });
+
+    const mailOptions = {
+      from: `"Amoryn Dating" <${process.env.EMAIL_USER}>`,
+      to: userEmail,
+      subject: '🎉 Welcome to Amoryn - Your Dating Journey Begins!',
+      html: `
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>Welcome to Amoryn</title>
+          <style>
+            body {
+              font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+              line-height: 1.6;
+              color: #333;
+              margin: 0;
+              padding: 0;
+              background-color: #f8f9fa;
+            }
+            .container {
+              max-width: 600px;
+              margin: 0 auto;
+              background: white;
+              border-radius: 20px;
+              overflow: hidden;
+              box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            }
+            .header {
+              background: linear-gradient(135deg, #ec294d, #d63384);
+              color: white;
+              text-align: center;
+              padding: 40px 20px;
+            }
+            .header h1 {
+              margin: 0;
+              font-size: 32px;
+              font-weight: 700;
+            }
+            .header p {
+              margin: 10px 0 0 0;
+              font-size: 18px;
+              opacity: 0.9;
+            }
+            .content {
+              padding: 40px 30px;
+            }
+            .welcome-message {
+              font-size: 20px;
+              color: #ec294d;
+              font-weight: 600;
+              margin-bottom: 20px;
+            }
+            .description {
+              font-size: 16px;
+              color: #666;
+              margin-bottom: 25px;
+              line-height: 1.7;
+            }
+            .features {
+              background: #f8f9fa;
+              padding: 25px;
+              border-radius: 15px;
+              margin: 25px 0;
+            }
+            .features h3 {
+              color: #ec294d;
+              margin-top: 0;
+              font-size: 18px;
+            }
+            .feature-list {
+              list-style: none;
+              padding: 0;
+              margin: 0;
+            }
+            .feature-list li {
+              padding: 8px 0;
+              color: #555;
+              position: relative;
+              padding-left: 25px;
+            }
+            .feature-list li:before {
+              content: "✨";
+              position: absolute;
+              left: 0;
+              color: #ec294d;
+            }
+            .cta-button {
+              display: inline-block;
+              background: linear-gradient(135deg, #ec294d, #d63384);
+              color: white;
+              text-decoration: none;
+              padding: 15px 30px;
+              border-radius: 25px;
+              font-weight: 600;
+              font-size: 16px;
+              margin: 20px 0;
+              transition: all 0.3s ease;
+            }
+            .cta-button:hover {
+              transform: translateY(-2px);
+              box-shadow: 0 8px 25px rgba(236, 41, 77, 0.3);
+            }
+            .footer {
+              background: #f8f9fa;
+              padding: 30px;
+              text-align: center;
+              color: #666;
+              font-size: 14px;
+            }
+            .social-links {
+              margin: 20px 0;
+            }
+            .social-links a {
+              color: #ec294d;
+              text-decoration: none;
+              margin: 0 10px;
+            }
+            .contact-info {
+              margin-top: 20px;
+              padding-top: 20px;
+              border-top: 1px solid #e9ecef;
+            }
+            .contact-info p {
+              margin: 5px 0;
+            }
+            @media (max-width: 600px) {
+              .container {
+                margin: 10px;
+                border-radius: 15px;
+              }
+              .header {
+                padding: 30px 15px;
+              }
+              .header h1 {
+                font-size: 28px;
+              }
+              .content {
+                padding: 30px 20px;
+              }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header">
+              <h1>🎉 Welcome to Amoryn!</h1>
+              <p>Your journey to find meaningful connections starts here</p>
+            </div>
+            
+            <div class="content">
+              <div class="welcome-message">
+                Hello ${userName}! 👋
+              </div>
+              
+              <div class="description">
+                Welcome to Amoryn, the premier dating platform designed to help you find genuine connections, meaningful relationships, and lasting love. We're thrilled to have you join our community!
+              </div>
+              
+              <div class="features">
+                <h3>🚀 What's Next?</h3>
+                <ul class="feature-list">
+                  <li>Complete your profile to stand out</li>
+                  <li>Discover amazing people in your area</li>
+                  <li>Start meaningful conversations</li>
+                  <li>Build genuine connections</li>
+                  <li>Upgrade to Premium for unlimited features</li>
+                </ul>
+              </div>
+              
+              <div style="text-align: center;">
+                <a href="https://amoryn.in" class="cta-button">
+                  🚀 Start Your Journey
+                </a>
+              </div>
+              
+              <div class="description">
+                <strong>Pro Tip:</strong> A complete profile with great photos increases your chances of making meaningful connections by up to 300%!
+              </div>
+            </div>
+            
+            <div class="footer">
+              <div class="social-links">
+                <a href="https://amoryn.in">🌐 Website</a>
+                <a href="mailto:support@amoryn.in">📧 Support</a>
+              </div>
+              
+              <div class="contact-info">
+                <p><strong>Need Help?</strong></p>
+                <p>📧 Email: support@amoryn.in</p>
+                <p>💬 We're here to help you succeed!</p>
+              </div>
+              
+              <p style="margin-top: 20px; font-size: 12px; color: #999;">
+                © 2024 Amoryn. All rights reserved. This email was sent to ${userEmail}
+              </p>
+            </div>
+          </div>
+        </body>
+        </html>
+      `,
+    };
+
+    await transporter.sendMail(mailOptions);
+    console.log(`Welcome email sent to ${userEmail}`);
+    return true;
+  } catch (error) {
+    console.error('Error sending welcome email:', error);
+    return false;
+  }
+};
+
 // ====== Signup ======
 router.post('/signup', async (req, res) => {
   try {
@@ -31,6 +259,15 @@ router.post('/signup', async (req, res) => {
     });
 
     await newUser.save();
+    
+    // Send welcome email
+    try {
+      await sendWelcomeEmail(newUser.email, newUser.name);
+    } catch (emailError) {
+      console.error('Failed to send welcome email:', emailError);
+      // Don't fail the signup if email fails
+    }
+    
     res.status(201).json({ message: 'Signup successful' });
   } catch (err) {
     console.error('Signup error:', err);
