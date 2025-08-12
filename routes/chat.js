@@ -26,12 +26,7 @@ router.get('/conversations', auth, async (req, res) => {
       _id: { $in: allUserIds, $ne: currentUserId }
     }).select('name photos profilePicture');
 
-    console.log('Raw users from database:', users);
-    console.log('Sample user object:', users[0]);
-
     const formatted = users.map(u => {
-      console.log('Processing user:', u._id, 'name:', u.name, 'photos:', u.photos, 'profilePicture:', u.profilePicture);
-      
       let photoUrl = null;
       
       // If user has profilePicture, use it
@@ -42,8 +37,6 @@ router.get('/conversations', auth, async (req, res) => {
       else if (u.photos && u.photos.length > 0) {
         photoUrl = `${BASE_URL}/${u.photos[0].replace(/^\//, '')}`;
       }
-      
-      console.log('Constructed photo URL:', photoUrl);
       
       return {
         _id: u._id,
@@ -76,6 +69,18 @@ router.get('/messages/:userId', auth, async (req, res) => {
       { from: otherUser, to: current, read: false },
       { $set: { read: true } }
     );
+
+    // Emit message-read event to update notification counts
+    const io = req.app.get('io');
+    const userSocketMap = global.userSocketMap;
+    const currentUserSocketId = userSocketMap.get(current.toString());
+    
+    if (currentUserSocketId) {
+      io.to(currentUserSocketId).emit('message-read', {
+        from: otherUser.toString(),
+        to: current.toString()
+      });
+    }
 
     const formatted = messages.map(m => ({
       fromSelf: m.from.toString() === current.toString(),

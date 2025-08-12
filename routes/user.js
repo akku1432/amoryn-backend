@@ -392,6 +392,30 @@ router.post('/match/action', auth, attachSubscription, async (req, res) => {
     if (action === 'like') {
       currentUser.likes.push(targetUserId);
       if (!req.user.isPremium) currentUser.dailyLikeCount++;
+      
+      // Check if this creates a mutual friendship
+      const targetUser = await User.findById(targetUserId);
+      if (targetUser && targetUser.likes.includes(currentUser._id)) {
+        // This is a mutual like - emit friend-request-accepted event
+        const io = req.app.get('io');
+        const userSocketMap = global.userSocketMap;
+        const targetSocketId = userSocketMap.get(targetUserId);
+        const currentUserSocketId = userSocketMap.get(currentUser._id);
+        
+        if (targetSocketId) {
+          io.to(targetSocketId).emit('friend-request-accepted', {
+            by: currentUser._id.toString(),
+            message: `${currentUser.name || 'Someone'} liked you back! You're now friends.`
+          });
+        }
+        
+        if (currentUserSocketId) {
+          io.to(currentUserSocketId).emit('friend-request-accepted', {
+            by: targetUserId,
+            message: `${targetUser.name || 'Someone'} liked you back! You're now friends.`
+          });
+        }
+      }
     } else {
       currentUser.dislikes.push(targetUserId);
     }
