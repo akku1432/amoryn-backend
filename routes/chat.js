@@ -32,13 +32,25 @@ router.get('/conversations', auth, async (req, res) => {
 
     console.log('Found users:', users.length);
 
-    const formatted = users.map(u => ({
-      _id: u._id,
-      name: u.name,
-      photo: u.photos && u.photos.length > 0 
-        ? `${BASE_URL}${u.photos[0]}`
-        : (u.profilePicture ? `${BASE_URL}/api/user/profile/picture/${u._id}` : null)
-    }));
+    const formatted = users.map(u => {
+      const photoUrl = u.photos && u.photos.length > 0 
+        ? `${BASE_URL}/${u.photos[0].replace(/^\//, '')}`
+        : (u.profilePicture ? `${BASE_URL}/api/user/profile/picture/${u._id}` : null);
+      
+      console.log('User photo construction:', {
+        userId: u._id,
+        name: u.name,
+        photos: u.photos,
+        photoPath: u.photos?.[0],
+        constructedUrl: photoUrl
+      });
+      
+      return {
+        _id: u._id,
+        name: u.name,
+        photo: photoUrl
+      };
+    });
 
     console.log('Formatted users:', formatted);
     res.json(formatted);

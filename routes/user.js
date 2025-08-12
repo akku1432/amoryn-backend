@@ -335,7 +335,7 @@ router.get('/match', auth, attachSubscription, async (req, res) => {
     const usersWithPhotos = matchedUsers.map(user => {
       const userObj = user.toObject();
       if (userObj.profilePicture) {
-        userObj.photos = [`/api/user/profile/picture/${userObj._id}`];
+        userObj.photos = [`api/user/profile/picture/${userObj._id}`];
       } else {
         // Set a consistent structure to prevent blinking
         userObj.photos = null;
@@ -429,7 +429,7 @@ router.get('/friends', auth, async (req, res) => {
     const friendsWithPhotos = mutualFriends.map(user => {
       const userObj = user.toObject();
       if (userObj.profilePicture) {
-        userObj.photos = [`/api/user/profile/picture/${userObj._id}`];
+        userObj.photos = [`api/user/profile/picture/${userObj._id}`];
       } else {
         // Set a consistent structure to prevent blinking
         userObj.photos = null;
@@ -455,7 +455,7 @@ router.get('/requests', auth, attachSubscription, async (req, res) => {
     const requestsWithPhotos = pending.map(user => {
       const userObj = user.toObject();
       if (userObj.profilePicture) {
-        userObj.photos = [`/api/user/profile/picture/${userObj._id}`];
+        userObj.photos = [`api/user/profile/picture/${userObj._id}`];
       } else {
         // Set a consistent structure to prevent blinking
         userObj.photos = null;
