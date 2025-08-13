@@ -596,15 +596,25 @@ router.put('/profile', auth, attachSubscription, upload.single('profilePicture')
 
     const { hobbies, smoking, drinking, relationshipType, bio, country, state, city } = req.body;
 
+    // Debug logging
+    console.log('Profile update request body:', req.body);
+    console.log('Raw relationshipType:', relationshipType);
+    console.log('Type of relationshipType:', typeof relationshipType);
+
     // Update text fields
     user.hobbies = normalizeHobbies(hobbies);
     user.smoking = normalizeString(smoking);
     user.drinking = normalizeString(drinking);
-    user.relationshipType = normalizeString(relationshipType);
+    user.relationshipType = normalizeHobbies(relationshipType); // Use normalizeHobbies for array fields
     user.bio = normalizeString(bio);
     user.country = normalizeString(country);
     user.state = normalizeString(state);
     user.city = normalizeString(city);
+
+    // Debug logging after normalization
+    console.log('Normalized relationshipType:', user.relationshipType);
+    console.log('Type of normalized relationshipType:', typeof user.relationshipType);
+    console.log('Is array?', Array.isArray(user.relationshipType));
 
     // Handle profile picture upload if provided
     if (req.file) {
@@ -656,7 +666,7 @@ router.put('/profile', auth, attachSubscription, upload.single('profilePicture')
     // Check if user has completed essential profile fields
     const hasCompletedProfile = user.hobbies && user.hobbies.length > 0 && 
                                user.smoking && user.drinking && 
-                               user.relationshipType && user.bio && 
+                               user.relationshipType && user.relationshipType.length > 0 && user.bio && 
                                user.country && user.state && user.city;
     
     if (hasCompletedProfile) {

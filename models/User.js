@@ -19,7 +19,7 @@ const userSchema = new mongoose.Schema({
   hobbies: [String],
   smoking: String,
   drinking: String,
-  relationshipType: String,
+  relationshipType: [String], // Changed from String to [String] to support multiple selections
   bio: String,
   photos: [String], // keep for other user gallery images if needed
   likes: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
