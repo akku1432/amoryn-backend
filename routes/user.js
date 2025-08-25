@@ -10,6 +10,44 @@ const upload = require('../middleware/upload');
 const { attachSubscription } = require('../middleware/subscription');
 const nodemailer = require('nodemailer');
 
+// Premium expiration check function
+const checkAndHandleExpiredReferralPremium = async () => {
+  try {
+    const now = new Date();
+    
+    // Find users with expired referral premium
+    const expiredUsers = await User.find({
+      isReferralPremium: true,
+      referralPremiumExpiry: { $lt: now },
+      isPremium: true
+    });
+    
+    console.log(`Found ${expiredUsers.length} users with expired referral premium`);
+    
+    for (const user of expiredUsers) {
+      // Remove premium status
+      user.isPremium = false;
+      user.isReferralPremium = false;
+      user.referralPremiumExpiry = null;
+      
+      await user.save();
+      
+      // Send expiration email
+      try {
+        await sendPremiumExpirationEmail(user.email, user.name);
+        console.log(`Premium expiration email sent to ${user.email}`);
+      } catch (emailError) {
+        console.error(`Failed to send premium expiration email to ${user.email}:`, emailError);
+      }
+    }
+    
+    return expiredUsers.length;
+  } catch (error) {
+    console.error('Error checking expired referral premium:', error);
+    return 0;
+  }
+};
+
 // Profile completion welcome email function
 const sendProfileCompletionEmail = async (userEmail, userName) => {
   try {
@@ -258,6 +296,239 @@ const sendProfileCompletionEmail = async (userEmail, userName) => {
     return true;
   } catch (error) {
     console.error('Error sending profile completion email:', error);
+    return false;
+  }
+};
+
+// Premium expiration email function for referral users
+const sendPremiumExpirationEmail = async (userEmail, userName) => {
+  try {
+    if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
+      console.error('Missing EMAIL_USER or EMAIL_PASS in .env');
+      return false;
+    }
+
+    const transporter = nodemailer.createTransporter({
+      service: 'gmail',
+      auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS,
+      },
+    });
+
+    const mailOptions = {
+      from: `"Amoryn Dating" <${process.env.EMAIL_USER}>`,
+      to: userEmail,
+      subject: '⏰ Your Free Premium Access Has Expired - Upgrade Now!',
+      html: `
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>Premium Expired - Amoryn</title>
+          <style>
+            body {
+              font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+              line-height: 1.6;
+              color: #333;
+              margin: 0;
+              padding: 0;
+              background-color: #f8f9fa;
+            }
+            .container {
+              max-width: 600px;
+              margin: 0 auto;
+              background: white;
+              border-radius: 20px;
+              overflow: hidden;
+              box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            }
+            .header {
+              background: linear-gradient(135deg, #dc3545, #c82333);
+              color: white;
+              text-align: center;
+              padding: 40px 20px;
+            }
+            .header h1 {
+              margin: 0;
+              font-size: 32px;
+              font-weight: 700;
+            }
+            .header p {
+              margin: 10px 0 0 0;
+              font-size: 18px;
+              opacity: 0.9;
+            }
+            .content {
+              padding: 40px 30px;
+            }
+            .expiry-message {
+              font-size: 20px;
+              color: #dc3545;
+              font-weight: 600;
+              margin-bottom: 20px;
+            }
+            .description {
+              font-size: 16px;
+              color: #666;
+              margin-bottom: 25px;
+              line-height: 1.7;
+            }
+            .premium-features {
+              background: #f8f9fa;
+              padding: 25px;
+              border-radius: 15px;
+              margin: 25px 0;
+            }
+            .premium-features h3 {
+              color: #dc3545;
+              margin-top: 0;
+              font-size: 18px;
+            }
+            .feature-list {
+              list-style: none;
+              padding: 0;
+              margin: 0;
+            }
+            .feature-list li {
+              padding: 8px 0;
+              color: #555;
+              position: relative;
+              padding-left: 25px;
+            }
+            .feature-list li:before {
+              content: "⭐";
+              position: absolute;
+              left: 0;
+              color: #dc3545;
+            }
+            .cta-button {
+              display: inline-block;
+              background: linear-gradient(135deg, #ec294d, #d63384);
+              color: white;
+              text-decoration: none;
+              padding: 15px 30px;
+              border-radius: 25px;
+              font-weight: 600;
+              font-size: 16px;
+              margin: 20px 0;
+              transition: all 0.3s ease;
+            }
+            .cta-button:hover {
+              transform: translateY(-2px);
+              box-shadow: 0 8px 25px rgba(236, 41, 77, 0.3);
+            }
+            .footer {
+              background: #f8f9fa;
+              padding: 30px;
+              text-align: center;
+              color: #666;
+              font-size: 14px;
+            }
+            .social-links {
+              margin: 20px 0;
+            }
+            .social-links a {
+              color: #ec294d;
+              text-decoration: none;
+              margin: 0 10px;
+            }
+            .contact-info {
+              margin-top: 20px;
+              padding-top: 20px;
+              border-top: 1px solid #e9ecef;
+            }
+            .contact-info p {
+              margin: 5px 0;
+            }
+            @media (max-width: 600px) {
+              .container {
+                margin: 10px;
+                border-radius: 15px;
+              }
+              .header {
+                padding: 30px 15px;
+              }
+              .header h1 {
+                font-size: 28px;
+              }
+              .content {
+                padding: 30px 20px;
+              }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header">
+              <h1>⏰ Premium Expired</h1>
+              <p>Your free premium access has ended</p>
+            </div>
+            
+            <div class="content">
+              <div class="expiry-message">
+                Hello ${userName}! 👋
+              </div>
+              
+              <div class="description">
+                Your 24-hour free premium access has expired. We hope you enjoyed experiencing all the premium features that Amoryn has to offer!
+              </div>
+              
+              <div class="premium-features">
+                <h3>🚀 What You'll Miss Without Premium:</h3>
+                <ul class="feature-list">
+                  <li>Unlimited likes and matches</li>
+                  <li>Advanced search filters</li>
+                  <li>See who liked you</li>
+                  <li>Priority customer support</li>
+                  <li>Video call features</li>
+                  <li>And much more!</li>
+                </ul>
+              </div>
+              
+              <div class="description">
+                <strong>💝 Special Offer:</strong> Upgrade now and continue enjoying all premium features with our best pricing!
+              </div>
+              
+              <div style="text-align: center;">
+                <a href="https://amoryn.in/subscription" class="cta-button">
+                  🔒 Upgrade to Premium Now
+                </a>
+              </div>
+              
+              <div class="description">
+                <strong>Pro Tip:</strong> Premium users get up to 10x more matches and connections compared to free users!
+              </div>
+            </div>
+            
+            <div class="footer">
+              <div class="social-links">
+                <a href="https://amoryn.in">🌐 Website</a>
+                <a href="mailto:support@amoryn.in">📧 Support</a>
+              </div>
+              
+              <div class="contact-info">
+                <p><strong>Need Help?</strong></p>
+                <p>📧 Email: support@amoryn.in</p>
+                <p>💬 We're here to help you succeed!</p>
+              </div>
+              
+              <p style="margin-top: 20px; font-size: 12px; color: #999;">
+                © 2024 Amoryn. All rights reserved. This email was sent to ${userEmail}
+              </p>
+            </div>
+          </div>
+        </body>
+        </html>
+      `,
+    };
+
+    await transporter.sendMail(mailOptions);
+    console.log(`Premium expiration email sent to ${userEmail}`);
+    return true;
+  } catch (error) {
+    console.error('Error sending premium expiration email:', error);
     return false;
   }
 };
@@ -574,6 +845,9 @@ const normalizeString = (value) => (typeof value === 'string' ? value : value ? 
 // ✅ GET /profile
 router.get('/profile', auth, attachSubscription, async (req, res) => {
   try {
+    // Check for expired referral premium before fetching profile
+    await checkAndHandleExpiredReferralPremium();
+    
     const user = await User.findById(req.user._id).select('-password');
     if (!user) return res.status(404).json({ error: 'User not found' });
 

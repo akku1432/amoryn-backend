@@ -328,6 +328,100 @@ router.get('/users', async (req, res) => {
   }
 });
 
+// GET newly registered users with referral codes (admin only)
+router.get('/new-users', async (req, res) => {
+  try {
+    // Get users registered in the last 30 days
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    
+    const newUsers = await User.find({
+      createdAt: { $gte: thirtyDaysAgo }
+    }).select('-password').lean();
+    
+    // Add premium status and referral information
+    const newUsersWithDetails = newUsers.map(user => ({
+      ...user,
+      isPremium: false, // Will be updated below
+      isReferralPremium: user.isReferralPremium || false,
+      referralCode: user.referralCode || null,
+      referralPremiumExpiry: user.referralPremiumExpiry || null,
+      isBlocked: user.isBlocked || false,
+      isSuspended: user.isSuspended || false,
+    }));
+
+    // Check premium status for each user
+    for (let user of newUsersWithDetails) {
+      const subscription = await Subscription.findOne({
+        userId: user._id,
+        endDate: { $gte: new Date() }
+      });
+      user.isPremium = !!subscription;
+    }
+
+    // Sort by creation date (newest first)
+    newUsersWithDetails.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+    res.json({
+      users: newUsersWithDetails,
+      total: newUsersWithDetails.length,
+      period: 'Last 30 days'
+    });
+  } catch (err) {
+    console.error('Error fetching new users:', err);
+    res.status(500).json({ error: 'Failed to fetch new users' });
+  }
+});
+
+// GET referral codes management (admin only)
+router.get('/referral-codes', async (req, res) => {
+  try {
+    // Get all users who used referral codes
+    const referralUsers = await User.find({
+      referralCode: { $exists: true, $ne: null }
+    }).select('referralCode email name createdAt isReferralPremium referralPremiumExpiry').lean();
+    
+    // Count usage of each referral code
+    const referralCodeStats = {};
+    referralUsers.forEach(user => {
+      const code = user.referralCode;
+      if (!referralCodeStats[code]) {
+        referralCodeStats[code] = {
+          code: code,
+          usageCount: 0,
+          activeUsers: 0,
+          users: []
+        };
+      }
+      referralCodeStats[code].usageCount++;
+      referralCodeStats[code].users.push({
+        email: user.email,
+        name: user.name,
+        createdAt: user.createdAt,
+        isReferralPremium: user.isReferralPremium,
+        referralPremiumExpiry: user.referralPremiumExpiry
+      });
+      
+      // Check if user still has active referral premium
+      if (user.isReferralPremium && user.referralPremiumExpiry && new Date(user.referralPremiumExpiry) > new Date()) {
+        referralCodeStats[code].activeUsers++;
+      }
+    });
+    
+    // Convert to array and sort by usage
+    const referralCodesArray = Object.values(referralCodeStats).sort((a, b) => b.usageCount - a.usageCount);
+    
+    res.json({
+      referralCodes: referralCodesArray,
+      totalCodes: referralCodesArray.length,
+      totalUsage: referralUsers.length
+    });
+  } catch (err) {
+    console.error('Error fetching referral codes:', err);
+    res.status(500).json({ error: 'Failed to fetch referral codes' });
+  }
+});
+
 // POST toggle premium status
 router.post('/premium', async (req, res) => {
   try {

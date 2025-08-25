@@ -30,6 +30,12 @@ const userSchema = new mongoose.Schema({
   isPremium: { type: Boolean, default: false },
   subscription: subscriptionSchema,
 
+  // 🎁 Referral system support
+  referralCode: { type: String, default: null }, // Code used during signup
+  referredBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null }, // Who referred this user
+  referralPremiumExpiry: { type: Date, default: null }, // When 24hr premium expires
+  isReferralPremium: { type: Boolean, default: false }, // Whether premium is from referral
+
   // 🔒 Admin management
   isBlocked: { type: Boolean, default: false },
   isSuspended: { type: Boolean, default: false },
