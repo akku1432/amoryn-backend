@@ -557,7 +557,27 @@ router.post('/signup', async (req, res) => {
       isPremium: isReferralPremium, // Set premium if referral code used
     });
 
+    // Debug logging for referral premium
+    console.log('Creating user with referral premium:', {
+      email: newUser.email,
+      referralCode: newUser.referralCode,
+      isReferralPremium: newUser.isReferralPremium,
+      referralPremiumExpiry: newUser.referralPremiumExpiry,
+      isPremium: newUser.isPremium
+    });
+
     await newUser.save();
+    
+    // Verify user was saved correctly
+    const savedUser = await User.findById(newUser._id);
+    console.log('User saved successfully:', {
+      userId: savedUser._id,
+      email: savedUser.email,
+      referralCode: savedUser.referralCode,
+      isReferralPremium: savedUser.isReferralPremium,
+      referralPremiumExpiry: savedUser.referralPremiumExpiry,
+      isPremium: savedUser.isPremium
+    });
     
     // Send appropriate email based on referral
     try {

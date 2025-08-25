@@ -48,6 +48,24 @@ const checkAndHandleExpiredReferralPremium = async () => {
   }
 };
 
+// Set up scheduled check for expired referral premium (every hour)
+const setupReferralPremiumCheck = () => {
+  // Check immediately when server starts
+  checkAndHandleExpiredReferralPremium();
+  
+  // Then check every hour
+  setInterval(async () => {
+    console.log('Running scheduled referral premium expiration check...');
+    const expiredCount = await checkAndHandleExpiredReferralPremium();
+    if (expiredCount > 0) {
+      console.log(`Expired ${expiredCount} referral premium users`);
+    }
+  }, 60 * 60 * 1000); // 1 hour in milliseconds
+};
+
+// Start the scheduled check
+setupReferralPremiumCheck();
+
 // Profile completion welcome email function
 const sendProfileCompletionEmail = async (userEmail, userName) => {
   try {
@@ -856,9 +874,37 @@ router.get('/profile', auth, attachSubscription, async (req, res) => {
       isPremium: req.user.isPremium,
       plan: req.user.subscriptionPlan,
       subscription: req.user.subscription,
+      isReferralPremium: req.user.isReferralPremium,
+      referralPremiumExpiry: req.user.referralPremiumExpiry,
     });
   } catch (err) {
     res.status(500).json({ error: 'Failed to fetch profile' });
+  }
+});
+
+// Debug endpoint to check referral premium status
+router.get('/referral-status', auth, async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    const now = new Date();
+    const isExpired = user.referralPremiumExpiry && new Date(user.referralPremiumExpiry) < now;
+    
+    res.json({
+      userId: user._id,
+      email: user.email,
+      referralCode: user.referralCode,
+      isReferralPremium: user.isReferralPremium,
+      referralPremiumExpiry: user.referralPremiumExpiry,
+      isExpired: isExpired,
+      currentTime: now,
+      timeRemaining: user.referralPremiumExpiry ? 
+        Math.max(0, new Date(user.referralPremiumExpiry) - now) : 0,
+      isPremium: user.isPremium
+    });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch referral status' });
   }
 });
 
