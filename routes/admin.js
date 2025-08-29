@@ -357,6 +357,7 @@ router.get('/new-users', async (req, res) => {
         endDate: { $gte: new Date() }
       });
       user.isPremium = !!subscription;
+      user.subscriptionPlan = subscription ? subscription.plan : null; // Add subscription plan info
     }
 
     // Sort by creation date (newest first)
