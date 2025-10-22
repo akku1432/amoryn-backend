@@ -1173,6 +1173,34 @@ router.delete('/delete', auth, async (req, res) => {
   }
 });
 
+// ✅ GET Public Profiles (No authentication required)
+router.get('/public/profiles', async (req, res) => {
+  try {
+    // Get random sample of users (limit to 20 for performance)
+    const allUsers = await User.find({}).select('-password').limit(20);
+
+    // Add profile picture URLs to photos array for frontend compatibility
+    const usersWithPhotos = allUsers.map(user => {
+      const userObj = user.toObject();
+      if (userObj.profilePicture) {
+        userObj.photos = [`api/user/profile/picture/${userObj._id}`];
+      } else {
+        // Set a consistent structure to prevent blinking
+        userObj.photos = null;
+      }
+      return userObj;
+    });
+
+    res.json({
+      users: usersWithPhotos,
+      isPremium: false,
+      plan: null,
+    });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch profiles' });
+  }
+});
+
 // ✅ GET Match Suggestions
 router.get('/match', auth, attachSubscription, async (req, res) => {
   try {
