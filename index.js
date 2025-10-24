@@ -72,11 +72,13 @@ const authRoutes = require('./routes/auth');
 const userRoutes = require('./routes/user');
 const chatRoutes = require('./routes/chat');
 const adminRoutes = require('./routes/admin');
+const travelRoutes = require('./routes/travel');
 
 app.use('/api/auth', authRoutes);
 app.use('/api/user', userRoutes);
 app.use('/api/chat', chatRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/travel', travelRoutes);
 
 // === WebSocket Events ===
 io.on('connection', (socket) => {
