@@ -286,8 +286,8 @@ const sendPremiumUpgradeEmail = async (userEmail, userName, plan) => {
 // Admin middleware to check if user is admin
 const adminAuth = async (req, res, next) => {
   try {
-    // Check if user is admin (support@amoryn.in)
-    if (req.user.email !== 'support@amoryn.in') {
+    // Check if user is admin (official@amoryn.in)
+    if (req.user.email !== 'official@amoryn.in') {
       return res.status(403).json({ error: 'Admin access required' });
     }
     next();

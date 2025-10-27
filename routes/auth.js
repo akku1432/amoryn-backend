@@ -608,7 +608,7 @@ router.post('/login', async (req, res) => {
 
   try {
     // Check if this is an admin login attempt
-    if (email === 'support@amoryn.in') {
+    if (email === 'official@amoryn.in') {
       // Admin authentication - check against hardcoded password hash
       // This password hash is for "Akkupalli@1432" - not visible in frontend
       const adminPasswordHash = '$2b$10$YourHashedPasswordHere'; // This will be replaced with actual hash
@@ -617,14 +617,14 @@ router.post('/login', async (req, res) => {
       // In production, you should use proper password hashing
       if (password === 'Akkupalli@1432') {
         // Check if admin user exists, if not create one
-        let adminUser = await User.findOne({ email: 'support@amoryn.in' });
+        let adminUser = await User.findOne({ email: 'official@amoryn.in' });
         
         if (!adminUser) {
           // Create admin user if it doesn't exist
           const hashedPassword = await bcrypt.hash('Akkupalli@1432', 10);
           adminUser = new User({
             name: 'Admin',
-            email: 'support@amoryn.in',
+            email: 'official@amoryn.in',
             gender: 'Other',
             dob: new Date('1990-01-01'),
             lookingFor: 'All',
