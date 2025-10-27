@@ -78,7 +78,7 @@ router.get('/plans', async (req, res) => {
 // ✅ GET User's Own Travel Plans (Authenticated)
 router.get('/my-plans', auth, async (req, res) => {
   try {
-    const travelPlans = await TravelPlan.find({ userId: req.user.userId })
+    const travelPlans = await TravelPlan.find({ userId: req.user._id })
       .sort({ createdAt: -1 });
     
     res.json({
@@ -120,7 +120,7 @@ router.post('/plans', auth, async (req, res) => {
     
     // Create new travel plan
     const travelPlan = new TravelPlan({
-      userId: req.user.userId,
+      userId: req.user._id,
       destination,
       startDate: start,
       endDate: end,
@@ -161,7 +161,7 @@ router.put('/plans/:id', auth, async (req, res) => {
     }
     
     // Check ownership
-    if (travelPlan.userId.toString() !== req.user.userId) {
+    if (travelPlan.userId.toString() !== req.user._id.toString()) {
       return res.status(403).json({ 
         success: false,
         error: 'You can only update your own travel plans' 
@@ -206,7 +206,7 @@ router.delete('/plans/:id', auth, async (req, res) => {
     }
     
     // Check ownership
-    if (travelPlan.userId.toString() !== req.user.userId) {
+    if (travelPlan.userId.toString() !== req.user._id.toString()) {
       return res.status(403).json({ 
         success: false,
         error: 'You can only delete your own travel plans' 
@@ -232,7 +232,7 @@ router.delete('/plans/:id', auth, async (req, res) => {
 router.post('/connect/:userId', auth, async (req, res) => {
   try {
     // Get current user
-    const currentUser = await User.findById(req.user.userId);
+    const currentUser = await User.findById(req.user._id);
     
     if (!currentUser) {
       return res.status(404).json({ 
