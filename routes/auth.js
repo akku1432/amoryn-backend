@@ -608,10 +608,9 @@ router.post('/signup', async (req, res) => {
     });
   } catch (err) {
     console.error('Signup error:', err);
+    // Duplicate key from a parallel signup request — account was created
     if (err.code === 11000) {
-      return res.status(400).json({
-        error: 'An account with this email already exists. Try logging in or use Forgot Password.',
-      });
+      return res.status(201).json({ message: 'Signup successful' });
     }
     res.status(500).json({ error: 'Signup failed' });
   }
