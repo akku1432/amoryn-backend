@@ -577,34 +577,20 @@ router.post('/signup', async (req, res) => {
     });
 
     await newUser.save();
-    
-    // Verify user was saved correctly
-    const savedUser = await User.findById(newUser._id);
-    console.log('User saved successfully:', {
-      userId: savedUser._id,
-      email: savedUser.email,
-      referralCode: savedUser.referralCode,
-      isReferralPremium: savedUser.isReferralPremium,
-      referralPremiumExpiry: savedUser.referralPremiumExpiry,
-      isPremium: savedUser.isPremium
-    });
-    
-    // Send appropriate email based on referral
-    try {
-      if (isReferralPremium) {
-        await sendReferralWelcomeEmail(newUser.email, newUser.name, referralCode.trim().toUpperCase());
-      } else {
-        await sendWelcomeEmail(newUser.email, newUser.name);
-      }
-    } catch (emailError) {
-      console.error('Failed to send welcome email:', emailError);
-      // Don't fail the signup if email fails
-    }
-    
-    res.status(201).json({ 
+
+    // Respond immediately — do not block signup on welcome email delivery
+    res.status(201).json({
       message: 'Signup successful',
       isReferralPremium,
-      referralPremiumExpiry: referralPremiumExpiry ? referralPremiumExpiry.toISOString() : null
+      referralPremiumExpiry: referralPremiumExpiry ? referralPremiumExpiry.toISOString() : null,
+    });
+
+    const sendEmail = isReferralPremium
+      ? () => sendReferralWelcomeEmail(newUser.email, newUser.name, referralCode.trim().toUpperCase())
+      : () => sendWelcomeEmail(newUser.email, newUser.name);
+
+    sendEmail().catch((emailError) => {
+      console.error('Failed to send welcome email:', emailError);
     });
   } catch (err) {
     console.error('Signup error:', err);
