@@ -48,24 +48,20 @@ app.options(/.*/, cors(corsOptions));
 
 app.use(express.json());
 
+const port = process.env.PORT || 5000;
+server.listen(port, () => console.log(`🚀 Server running on port ${port}`));
+
 // === MongoDB Connection ===
-mongoose.connect(process.env.MONGO_URI, {
-  useNewUrlParser: true,
-  useUnifiedTopology: true,
-})
-.then(() => {
-  console.log('✅ MongoDB Connected');
-
-  // Initialize GridFS bucket globally
-  global.gfsBucket = new mongoose.mongo.GridFSBucket(mongoose.connection.db, {
-    bucketName: 'profilePictures'
-  });
-  console.log('📦 GridFS bucket initialized');
-
-  const port = process.env.PORT || 5000;
-  server.listen(port, () => console.log(`🚀 Server running on port ${port}`));
-})
-.catch((err) => console.error('❌ MongoDB connection error:', err));
+mongoose
+  .connect(process.env.MONGO_URI)
+  .then(() => {
+    console.log('✅ MongoDB Connected');
+    global.gfsBucket = new mongoose.mongo.GridFSBucket(mongoose.connection.db, {
+      bucketName: 'profilePictures',
+    });
+    console.log('📦 GridFS bucket initialized');
+  })
+  .catch((err) => console.error('❌ MongoDB connection error:', err));
 
 // === Routes ===
 const authRoutes = require('./routes/auth');
