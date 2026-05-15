@@ -53,9 +53,11 @@ server.listen(port, () => console.log(`🚀 Server running on port ${port}`));
 
 // === MongoDB Connection ===
 mongoose
-  .connect(process.env.MONGO_URI)
+  .connect(process.env.MONGO_URI, {
+    dbName: process.env.MONGO_DB_NAME || 'amoryn',
+  })
   .then(() => {
-    console.log('✅ MongoDB Connected');
+    console.log(`✅ MongoDB Connected (database: ${mongoose.connection.name})`);
     global.gfsBucket = new mongoose.mongo.GridFSBucket(mongoose.connection.db, {
       bucketName: 'profilePictures',
     });

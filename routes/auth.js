@@ -4,6 +4,7 @@ const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const nodemailer = require('nodemailer');
+const { normalizeEmail, isValidEmail, findUserByEmail } = require('../utils/email');
 
 // Welcome email function
 const sendWelcomeEmail = async (userEmail, userName) => {
@@ -486,13 +487,22 @@ router.post('/signup', async (req, res) => {
   try {
     const { name, email, gender, dob, lookingFor, password, referralCode } = req.body;
 
-    if (!name || !email || !gender || !dob || !lookingFor || !password) {
+    const normalizedEmail = normalizeEmail(email);
+    const trimmedName = typeof name === 'string' ? name.trim() : '';
+
+    if (!trimmedName || !normalizedEmail || !gender || !dob || !lookingFor || !password) {
       return res.status(400).json({ error: 'All fields are required' });
     }
 
-    const existingUser = await User.findOne({ email: email.trim().toLowerCase() });
+    if (!isValidEmail(normalizedEmail)) {
+      return res.status(400).json({ error: 'Invalid email address' });
+    }
+
+    const existingUser = await findUserByEmail(normalizedEmail);
     if (existingUser) {
-      return res.status(400).json({ error: 'Email already exists' });
+      return res.status(400).json({
+        error: 'An account with this email already exists. Try logging in or use Forgot Password.',
+      });
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
@@ -544,8 +554,8 @@ router.post('/signup', async (req, res) => {
     }
 
     const newUser = new User({
-      name,
-      email: email.trim().toLowerCase(),
+      name: trimmedName,
+      email: normalizedEmail,
       gender,
       dob: new Date(dob),
       lookingFor,
@@ -598,6 +608,11 @@ router.post('/signup', async (req, res) => {
     });
   } catch (err) {
     console.error('Signup error:', err);
+    if (err.code === 11000) {
+      return res.status(400).json({
+        error: 'An account with this email already exists. Try logging in or use Forgot Password.',
+      });
+    }
     res.status(500).json({ error: 'Signup failed' });
   }
 });
@@ -641,7 +656,7 @@ router.post('/login', async (req, res) => {
     }
 
     // Regular user login
-    const user = await User.findOne({ email: email.trim().toLowerCase() });
+    const user = await findUserByEmail(email);
     if (!user) return res.status(401).json({ error: 'Invalid email or password' });
 
     const isMatch = await bcrypt.compare(password, user.password);
@@ -660,7 +675,7 @@ router.post('/forgot-password', async (req, res) => {
   const { email } = req.body;
 
   try {
-    const user = await User.findOne({ email: email.trim().toLowerCase() });
+    const user = await findUserByEmail(email);
     if (!user) return res.status(404).json({ message: 'User not found' });
 
     const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, { expiresIn: '15m' });
