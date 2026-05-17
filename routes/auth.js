@@ -5,6 +5,7 @@ const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const nodemailer = require('nodemailer');
 const { normalizeEmail, isValidEmail, findUserByEmail } = require('../utils/email');
+const { FRONTEND_URL } = require('../config');
 
 // Welcome email function
 const sendWelcomeEmail = async (userEmail, userName) => {
@@ -660,22 +661,32 @@ router.post('/forgot-password', async (req, res) => {
   const { email } = req.body;
 
   try {
-    const user = await findUserByEmail(email);
+    const normalizedEmail = normalizeEmail(email);
+    if (!normalizedEmail || !isValidEmail(normalizedEmail)) {
+      return res.status(400).json({ message: 'Please enter a valid email address' });
+    }
+
+    const user = await findUserByEmail(normalizedEmail);
     if (!user) return res.status(404).json({ message: 'User not found' });
 
+    if (!process.env.JWT_SECRET) {
+      console.error('Missing JWT_SECRET in environment');
+      return res.status(500).json({ message: 'Server configuration error' });
+    }
+
     const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, { expiresIn: '15m' });
-    const resetLink = `${BASE_URL}/reset-password/${token}`;
+    const resetLink = `${FRONTEND_URL}/reset-password/${token}`;
 
     if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
-      console.error('Missing EMAIL_USER or EMAIL_PASS in .env');
-      return res.status(500).json({ message: 'Email credentials are not set' });
+      console.error('Missing EMAIL_USER or EMAIL_PASS in environment');
+      return res.status(500).json({ message: 'Email service is not configured. Please contact support.' });
     }
 
     const transporter = nodemailer.createTransport({
       service: 'gmail',
       auth: {
         user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS,
+        pass: String(process.env.EMAIL_PASS).replace(/\s/g, ''),
       },
     });
 
